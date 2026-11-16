@@ -54,7 +54,7 @@ export default function Home() {
         fetch(API+'/resources/tafsirs?language='+language).then(r=>r.json()).catch(()=>({tafsirs:[]}))
       ]);
       const trans=(td.translations||[]).find((x:{id:number;name:string})=>translationTerms[language].some(term=>x.name.toLowerCase().includes(term))) || (td.translations||[])[0];
-      const taf=(fd.tafsirs||[]).find((x:{id:number;name:string})=>x.name.toLowerCase().includes(language==='ar'?'الميسر':'ibn kathir')) || (fd.tafsirs||[])[0];
+      const taf=(fd.tafsirs||[]).find((x:{id:number;name:string})=>{const name=x.name.toLowerCase();return name.includes('muyassar')||name.includes('الميسر');});
       const params=new URLSearchParams({language,fields:'text_uthmani,text_uthmani_tajweed',audio:String(reader),per_page:'300'});
       if(trans)params.set('translations',String(trans.id));
       if(taf)params.set('tafsirs',String(taf.id));

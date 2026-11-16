@@ -39,3 +39,8 @@ Use each provider according to its current API documentation and terms. API avai
 ## GitHub Pages
 
 To publish as a static site, open **Settings → Pages**, choose **Deploy from a branch**, select **main** and **/(root)**, then save. GitHub Pages will publish the repository's `index.html` after its build completes.
+
+
+## Reciter catalogue
+
+The static reader loads the complete reciter list returned by MP3Quran and includes a **Find reciter** search field. Requested priority names, including Hicham El Harraz, Abdulrahman Al-Shahat and Abdullah Khayyat, are documented in [`docs/RECITERS.md`](docs/RECITERS.md). A name in that priority list does not imply that recordings are currently available; the UI only lists recordings returned by the provider. Verify coverage, recitation narration, attribution and reuse rights before public release.

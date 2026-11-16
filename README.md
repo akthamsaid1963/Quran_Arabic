@@ -1,48 +1,37 @@
-# Al-Bayan — القرآن الكريم
+# Al-Quran — القرآن الكريم
 
-A responsive multilingual Quran reader built with Next.js. The app includes the 114-surah index, Quran.com Uthmani/Tajweed text, verse audio controls, repeat playback, and language selection for Arabic, English, German and French.
+A responsive, static Quran reader for GitHub Pages. The interface supports Arabic, English, German and French, with a searchable index of all 114 surahs, Uthmani Arabic text, provider-supplied Tajweed markup, translations, Tafsir resources, reciter selection, verse playback, repeat controls and verse-level playback highlighting.
 
 ## Run locally
 
-```bash
-npm install
-npm run dev
-```
-
-For a production build:
+This is a static site. Open `index.html` in a browser or serve the folder:
 
 ```bash
-npm run build
-npx serve out
+python -m http.server 8000
 ```
 
-## Included
+Then visit http://localhost:8000.
 
-- Searchable index for all 114 surahs.
-- Arabic Quran text requested from the Quran.com API, including Tajweed-marked Uthmani text when supplied by the API.
-- Language selection for Arabic, English, German and French.
-- Translation and Tafsir resources are selected from the provider's language catalogue. Tafsir is not silently replaced with a translation; if the selected language has no matching Al-Muyassar resource, the Tafsir panel reports that it is unavailable.
-- Reciter catalogue populated dynamically from Quran.com recitation resources, with a search field.
-- Verse playback, repeat counts and sequential surah playback when audio URLs are available.
-- Responsive desktop and mobile layout with RTL support.
+## Data and integrity
 
-## Build and deployment
+- Quran text, Uthmani/Tajweed verse markup, translations, Tafsir catalogues and recitation audio are requested from the Quran.com public API (Quran Foundation).
+- Surah and reciter catalogues are loaded dynamically.
+- Translation and Tafsir resources are selected from the requested language's provider catalogue. If a language-specific Tafsir is not offered by the provider, the interface says so rather than inventing a translation or presenting a different language as if it were the requested one.
+- Verse audio is played separately for each Ayah. The currently recited Ayah is highlighted while its recording plays; repeat options include once, three times, five times and indefinitely.
+- Tajweed colours are rendered from the provider's Tajweed markup. The legend is a simplified visual guide, not a substitute for learning with a qualified teacher.
 
-Every push to `main` triggers the GitHub Actions workflow in `.github/workflows/deploy.yml`. It installs dependencies, runs `next build` (static export), and deploys the generated `out/` directory to GitHub Pages.
+**Important:** This project is a software interface, not a certified Madani Mushaf, scholarly Tafsir edition or Tajweed teaching authority. Before educational/public use, have the displayed script, Tajweed mapping, translations and Tafsir editions reviewed by qualified specialists. Quran Foundation's developer terms and the relevant content licences govern reuse, caching and redistribution. Do not scrape, bundle or redistribute recordings without permission.
 
-**One-time repository setup:** in GitHub, open **Settings → Pages** and set **Build and deployment → Source** to **GitHub Actions**. Then open the **Actions** tab and monitor the “Build and deploy Al-Bayan to GitHub Pages” workflow.
+## Deploy to GitHub Pages
 
-After a successful deployment, the expected project URL is:
+The workflow in `.github/workflows/deploy.yml` publishes the repository root whenever a commit reaches `main`. In GitHub, open **Settings → Pages** and select **GitHub Actions** as the deployment source.
 
-https://akthamsaid1963.github.io/Quran_Arabic/
+Expected site URL: https://akthamsaid1963.github.io/Quran_Arabic/
 
-## Data providers and important limitations
+The repository's existing custom domain is retained in `CNAME`.
 
-- [Quran.com](https://quran.com) — Quran text, translations, Tafsir catalogues and recitation resources.
-- [MP3Quran](https://mp3quran.net) — documented as an additional reciter source; availability varies by reciter and recording.
+## Sources
 
-The application fetches content from external APIs at runtime. Provider availability, API response fields, resource identifiers, audio coverage and licensing terms can change. No external content is bundled into this repository.
-
-This is a software implementation, **not a certified Madani Mushaf, scholarly Tafsir edition, or Tajweed teaching authority**. The displayed Tajweed colours use provider-supplied markup and a provisional CSS mapping. Before educational or public release, have the text, verse boundaries, Tajweed mapping, translations and Tafsir reviewed by qualified specialists and verify redistribution rights for every source.
-
-The requested reciters Hicham El Harraz, Abdulrahman Al-Shahat and Abdullah Khayyat are recorded in [the reciter notes](docs/RECITERS.md). A requested name is not a claim that a recording is available from the live provider catalogue.
+- https://quran.com
+- https://api-docs.quran.com/
+- https://github.com/quran/quran.com-frontend-next

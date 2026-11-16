@@ -67,9 +67,7 @@ export default function Home() {
         const name=(x.name||'').toLowerCase();
         const langName=(x.language_name||'').toLowerCase();
         return terms[language].some(term=>name.includes(term)) &&
-          (langName.includes(language) || (language==='en' && langName.includes('english')) ||
-           (language==='de' && langName.includes('german')) ||
-           (language==='fr' && langName.includes('french')));
+          true;
       });
       const tafsirs=(tafsirCatalog.tafsirs||[]) as {id:number;name?:string}[];
       const muyassar=tafsirs.find(x=>{
@@ -89,6 +87,7 @@ export default function Home() {
         const params=new URLSearchParams({
           language,
           fields:'text_uthmani,text_uthmani_tajweed',
+          audio:String(reader),
           per_page:'50',
           page:String(page),
           tafsirs:String(muyassar.id)
@@ -102,23 +101,10 @@ export default function Home() {
         page+=1;
       } while(page<=totalPages && page<=10);
 
-      // Fetch the selected ayah-by-ayah recitation separately and join by
-      // canonical verse_key (e.g. "2:255"), never by array position.
-      let audioByVerse:Record<string,string>={};
-      try {
-        const audioResponse=await fetch(API+'/quran/recitations/'+reader+'?chapter_number='+id);
-        if(audioResponse.ok) {
-          const audioData=await audioResponse.json();
-          for(const file of (audioData.audio_files||[]) as {verse_key?:string;url?:string}[]) {
-            if(file.verse_key && file.url) audioByVerse[file.verse_key]=file.url;
-          }
-        }
-      } catch { /* Keep readable verses available if audio service is temporarily down. */ }
-
-      const merged=allVerses.map(v=>({
-        ...v,
-        audio: {url:audioByVerse[id+':'+v.verse_number] || v.audio?.url}
-      }));
+      // The verse endpoint returns the selected recitation alongside each
+      // verse, so text, tafsir, translation and audio stay attached to the
+      // same canonical verse record (not to an independently sorted array).
+      const merged=allVerses;
       if(merged.length===0) throw new Error('No verses returned by the Quran service.');
       setVerses(merged);
     } catch(e) {

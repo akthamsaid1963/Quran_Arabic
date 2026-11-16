@@ -17,7 +17,6 @@ const copy: Record<Lang, Record<string,string>> = {
   fr: { brand:'AL-BAYAN', tagline:'CORAN · RÉCITATION · MÉDITATION', title:'Un voyage à travers le Saint Coran', intro:'Lisez, écoutez et méditez chaque verset.', search:'Rechercher une sourate...', surahs:'Index des sourates', translation:'Traduction', tafsir:'Tafsir', reciter:'Récitateur', repeat:'Répéter le verset', once:'Une fois', continuous:'En continu', play:'Écouter', playAll:'Lire la sourate', stop:'Arrêter', loading:'Chargement des versets...', choose:'Choisissez une sourate', ayah:'Verset', noAudio:'Aucun enregistrement de ce récitateur pour ce verset.', source:'Les textes et enregistrements restent soumis aux conditions des fournisseurs.' }
 };
 const preferred = ['Mahmoud Khalil Al-Husary','Abdul Basit','Mohamed Siddiq Al-Minshawi','Mustafa Ismail','Mahmoud Ali Al-Banna','Mohamed Mahmoud Al-Tablawi','Mishary Rashid Alafasy','Abdulrahman Al-Sudais','Saud Al-Shuraim','Maher Al-Muaiqly','Yasser Al-Dosari','Abu Bakr Al-Shatri','Nasser Al-Qatami','Idris Abkar','Hani Al-Rifai','Fares Abbad','Hicham El Harraz','Abdulrahman Al-Shahat','Abdullah Khayyat'];
-const translationTerms: Record<Lang,string[]> = { ar:['الميسر','التفسير الميسر'], en:['clear quran','sahih international'], de:['bubenheim','khoury'], fr:['hamidullah'] };
 const tajweedLegend = [{name:'غنة وإخفاء',color:'taj-green'},{name:'إدغام',color:'taj-blue'},{name:'مد وإقلاب',color:'taj-purple'},{name:'قلقلة',color:'taj-orange'}];
 
 export default function Home() {
@@ -62,12 +61,10 @@ export default function Home() {
         de:['bubenheim','khoury'],
         fr:['hamidullah']
       };
-      const translations=(translationCatalog.translations||[]) as {id:number;name?:string;language_name?:string}[];
+      const translations=(translationCatalog.translations||[]) as {id:number;name?:string}[];
       const selectedTranslation = language==='ar' ? undefined : translations.find(x=>{
         const name=(x.name||'').toLowerCase();
-        const langName=(x.language_name||'').toLowerCase();
-        return terms[language].some(term=>name.includes(term)) &&
-          true;
+        return terms[language].some(term=>name.includes(term));
       });
       const tafsirs=(tafsirCatalog.tafsirs||[]) as {id:number;name?:string}[];
       const muyassar=tafsirs.find(x=>{
@@ -87,7 +84,6 @@ export default function Home() {
         const params=new URLSearchParams({
           language,
           fields:'text_uthmani,text_uthmani_tajweed',
-          audio:String(reader),
           per_page:'50',
           page:String(page),
           tafsirs:String(muyassar.id)
@@ -101,10 +97,34 @@ export default function Home() {
         page+=1;
       } while(page<=totalPages && page<=10);
 
-      // The verse endpoint returns the selected recitation alongside each
-      // verse, so text, tafsir, translation and audio stay attached to the
-      // same canonical verse record (not to an independently sorted array).
-      const merged=allVerses;
+      // Load ayah audio files separately and join by canonical verse_key.
+      // Some API versions return relative CDN paths, so normalize those too.
+      const audioByKey:Record<string,string>={};
+      try {
+        let audioPage=1;
+        let audioPages=1;
+        do {
+          const audioResponse=await fetch(API+'/recitations/'+reader+'/by_chapter/'+id+'?per_page=50&page='+audioPage);
+          if(!audioResponse.ok) throw new Error('Audio catalogue unavailable');
+          const audioData=await audioResponse.json();
+          for(const file of (audioData.audio_files||[]) as {verse_key?:string;url?:string}[]) {
+            if(file.verse_key && file.url) {
+              audioByKey[file.verse_key]=/^https?:\\/\\//i.test(file.url)
+                ? file.url
+                : new URL(file.url.replace(/^\\/+/,''),'https://verses.quran.foundation/').toString();
+            }
+          }
+          audioPages=Number(audioData.pagination?.total_pages||1);
+          audioPage+=1;
+        } while(audioPage<=audioPages && audioPage<=10);
+      } catch {
+        // Keep verse text and tafsir available if the audio service is down.
+      }
+
+      const merged=allVerses.map(v=>({
+        ...v,
+        audio:{url:audioByKey[id+':'+v.verse_number] || v.audio?.url}
+      }));
       if(merged.length===0) throw new Error('No verses returned by the Quran service.');
       setVerses(merged);
     } catch(e) {

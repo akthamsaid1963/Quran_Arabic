@@ -47,22 +47,84 @@ export default function Home() {
   }).catch(()=>setError('تعذر تحميل قائمة القراء.')); },[]);
 
   const loadVerses = useCallback(async(id:number,language:Lang,reader:number)=>{
-    setLoading(true);setError('');setActive(null);setPlayingAll(false);
+    setLoading(true);setError('');setActive(null);setPlayingAll(false);setVerses([]);
     try {
-      const [td,fd]=await Promise.all([
-        fetch(API+'/resources/translations?language='+language).then(r=>r.json()).catch(()=>({translations:[]})),
-        fetch(API+'/resources/tafsirs?language='+language).then(r=>r.json()).catch(()=>({tafsirs:[]}))
+      // Tafsir Al-Muyassar is an Arabic tafsir. Fetch its resource ID from
+      // the Arabic catalogue regardless of the interface language.
+      const [translationCatalog, tafsirCatalog] = await Promise.all([
+        language==='ar'
+          ? Promise.resolve({translations:[]})
+          : fetch(API+'/resources/translations?language='+language).then(r=>{if(!r.ok)throw new Error('Translation catalogue unavailable');return r.json();}),
+        fetch(API+'/resources/tafsirs?language=ar').then(r=>{if(!r.ok)throw new Error('Tafsir catalogue unavailable');return r.json();})
       ]);
-      const trans=(td.translations||[]).find((x:{id:number;name:string})=>translationTerms[language].some(term=>x.name.toLowerCase().includes(term))) || (td.translations||[])[0];
-      const taf=(fd.tafsirs||[]).find((x:{id:number;name:string})=>{const name=x.name.toLowerCase();return name.includes('muyassar')||name.includes('الميسر');});
-      const params=new URLSearchParams({language,fields:'text_uthmani,text_uthmani_tajweed',audio:String(reader),per_page:'300'});
-      if(trans)params.set('translations',String(trans.id));
-      if(taf)params.set('tafsirs',String(taf.id));
-      const response=await fetch(API+'/verses/by_chapter/'+id+'?'+params.toString());
-      if(!response.ok)throw new Error('HTTP '+response.status);
-      const data=await response.json();setVerses(data.verses||[]);
-    } catch {setVerses([]);setError('تعذر تحميل محتوى السورة حالياً. حاول مرة أخرى.');}
-    finally{setLoading(false);}
+      const terms:Record<Exclude<Lang,'ar'>,string[]> = {
+        en:['sahih international','clear quran'],
+        de:['bubenheim','khoury'],
+        fr:['hamidullah']
+      };
+      const translations=(translationCatalog.translations||[]) as {id:number;name?:string;language_name?:string}[];
+      const selectedTranslation = language==='ar' ? undefined : translations.find(x=>{
+        const name=(x.name||'').toLowerCase();
+        const langName=(x.language_name||'').toLowerCase();
+        return terms[language].some(term=>name.includes(term)) &&
+          (langName.includes(language) || (language==='en' && langName.includes('english')) ||
+           (language==='de' && langName.includes('german')) ||
+           (language==='fr' && langName.includes('french')));
+      });
+      const tafsirs=(tafsirCatalog.tafsirs||[]) as {id:number;name?:string}[];
+      const muyassar=tafsirs.find(x=>{
+        const name=(x.name||'').toLowerCase();
+        return name.includes('muyassar') || name.includes('الميسر');
+      });
+      if(language!=='ar' && !selectedTranslation) {
+        throw new Error('لم نعثر على ترجمة موثوقة للغة المختارة؛ لن نعرض ترجمة بلغة أخرى.');
+      }
+      if(!muyassar) throw new Error('تعذر العثور على مورد التفسير الميسر.');
+
+      // Quran.com caps this endpoint at 50 verses per page.
+      const allVerses:Verse[]=[];
+      let page=1;
+      let totalPages=1;
+      do {
+        const params=new URLSearchParams({
+          language,
+          fields:'text_uthmani,text_uthmani_tajweed',
+          per_page:'50',
+          page:String(page),
+          tafsirs:String(muyassar.id)
+        });
+        if(selectedTranslation) params.set('translations',String(selectedTranslation.id));
+        const response=await fetch(API+'/verses/by_chapter/'+id+'?'+params.toString());
+        if(!response.ok) throw new Error('Verse request failed: HTTP '+response.status);
+        const data=await response.json();
+        allVerses.push(...((data.verses||[]) as Verse[]));
+        totalPages=Number(data.pagination?.total_pages||1);
+        page+=1;
+      } while(page<=totalPages && page<=10);
+
+      // Fetch the selected ayah-by-ayah recitation separately and join by
+      // canonical verse_key (e.g. "2:255"), never by array position.
+      let audioByVerse:Record<string,string>={};
+      try {
+        const audioResponse=await fetch(API+'/quran/recitations/'+reader+'?chapter_number='+id);
+        if(audioResponse.ok) {
+          const audioData=await audioResponse.json();
+          for(const file of (audioData.audio_files||[]) as {verse_key?:string;url?:string}[]) {
+            if(file.verse_key && file.url) audioByVerse[file.verse_key]=file.url;
+          }
+        }
+      } catch { /* Keep readable verses available if audio service is temporarily down. */ }
+
+      const merged=allVerses.map(v=>({
+        ...v,
+        audio: {url:audioByVerse[id+':'+v.verse_number] || v.audio?.url}
+      }));
+      if(merged.length===0) throw new Error('No verses returned by the Quran service.');
+      setVerses(merged);
+    } catch(e) {
+      setVerses([]);
+      setError(e instanceof Error ? e.message : 'تعذر تحميل محتوى السورة حالياً. حاول مرة أخرى.');
+    } finally {setLoading(false);}
   },[]);
   useEffect(()=>{loadVerses(chapter,lang,reciter);},[chapter,lang,reciter,loadVerses]);
 

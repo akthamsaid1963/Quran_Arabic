@@ -109,9 +109,7 @@ export default function Home() {
           const audioData=await audioResponse.json();
           for(const file of (audioData.audio_files||[]) as {verse_key?:string;url?:string}[]) {
             if(file.verse_key && file.url) {
-              audioByKey[file.verse_key]=/^https?:\\/\\//i.test(file.url)
-                ? file.url
-                : new URL(file.url.replace(/^\\/+/,''),'https://verses.quran.foundation/').toString();
+              audioByKey[file.verse_key]=new URL(file.url,'https://verses.quran.foundation/').toString();
             }
           }
           audioPages=Number(audioData.pagination?.total_pages||1);

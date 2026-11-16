@@ -84,6 +84,7 @@ export default function Home() {
         const params=new URLSearchParams({
           language,
           fields:'text_uthmani,text_uthmani_tajweed',
+          audio:String(reader),
           per_page:'50',
           page:String(page),
           tafsirs:String(muyassar.id)
@@ -97,32 +98,10 @@ export default function Home() {
         page+=1;
       } while(page<=totalPages && page<=10);
 
-      // Load ayah audio files separately and join by canonical verse_key.
-      // Some API versions return relative CDN paths, so normalize those too.
-      const audioByKey:Record<string,string>={};
-      try {
-        let audioPage=1;
-        let audioPages=1;
-        do {
-          const audioResponse=await fetch(API+'/recitations/'+reader+'/by_chapter/'+id+'?per_page=50&page='+audioPage);
-          if(!audioResponse.ok) throw new Error('Audio catalogue unavailable');
-          const audioData=await audioResponse.json();
-          for(const file of (audioData.audio_files||[]) as {verse_key?:string;url?:string}[]) {
-            if(file.verse_key && file.url) {
-              audioByKey[file.verse_key]=new URL(file.url,'https://verses.quran.foundation/').toString();
-            }
-          }
-          audioPages=Number(audioData.pagination?.total_pages||1);
-          audioPage+=1;
-        } while(audioPage<=audioPages && audioPage<=10);
-      } catch {
-        // Keep verse text and tafsir available if the audio service is down.
-      }
-
-      const merged=allVerses.map(v=>({
-        ...v,
-        audio:{url:audioByKey[id+':'+v.verse_number] || v.audio?.url}
-      }));
+      // The Quran.com verse endpoint returns the chosen recitation as
+      // audio.url on each verse when the audio query parameter is supplied.
+      // Keeping it in the same response prevents cross-verse audio mismatches.
+      const merged=allVerses;
       if(merged.length===0) throw new Error('No verses returned by the Quran service.');
       setVerses(merged);
     } catch(e) {

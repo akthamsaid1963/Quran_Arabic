@@ -33,7 +33,7 @@ main{max-width:1180px;margin:28px auto;padding:0 20px}.intro{display:flex;justif
 <div class="reader-head"><div><h2 id="surahTitle">Al-Fatihah</h2><p id="surahMeta">The Opening · 7 verses</p></div><div class="arabic-name" id="surahArabic">الفاتحة</div></div>
 <div class="controls">
 <label>Translation <select id="language"><option value="ar">العربية</option><option value="en">English</option><option value="de">German</option><option value="fr">French</option></select></label>
-<label>Reciter <select id="reciter"><option value="7">Abdul Basit Abdul Samad</option></select></label>
+<label>Surah reciter <select id="reciter"><option value="7">Abdul Basit Abdul Samad</option></select></label><label>Verse reciter <select id="verseReciter"><option value="7">Loading…</option></select></label>
 <label>Repeat <select id="repeat"><option value="1">Once</option><option value="2">2 times</option><option value="3">3 times</option><option value="5">5 times</option><option value="10">10 times</option><option value="0">Continuous</option></select></label>
 <div class="audio-row"><button class="primary" id="playAll">▶ Play Surah</button><button id="stop">■ Stop</button><audio id="audio" controls preload="none"></audio></div>
 </div>
@@ -46,12 +46,12 @@ main{max-width:1180px;margin:28px auto;padding:0 20px}.intro{display:flex;justif
 <script>
 const API='https://api.quran.com/api/v4', MP3='https://mp3quran.net/api/v3';
 const $=id=>document.getElementById(id);
-let chapters=[], current=1, reciters=[], audioTimer=null, verseRows=[], playingIndex=-1, loopCount=1, verseLoop=0, verseEndHandler=null;
+let chapters=[], current=1, reciters=[], verseRecitations=[], audioTimer=null, verseRows=[], playingIndex=-1, loopCount=1, verseLoop=0, verseEndHandler=null;
 const uiText={ar:{surah:'فهرس السور · ١١٤',play:'▶ تشغيل السورة',stop:'■ إيقاف'},en:{surah:'Surah index · 114',play:'▶ Play Surah',stop:'■ Stop'},de:{surah:'Suren · 114',play:'▶ Sure abspielen',stop:'■ Stopp'},fr:{surah:'Index des sourates · 114',play:'▶ Lire la sourate',stop:'■ Arrêter'}};
 function safe(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 async function get(url){const r=await fetch(url);if(!r.ok)throw Error('HTTP '+r.status);return r.json();}
 async function init(){
- try{const d=await get(API+'/chapters?language=en');chapters=d.chapters||[];renderChapters();await loadSurah(1);}
+ try{const d=await get(API+'/chapters?language=en');chapters=d.chapters||[];renderChapters();try{const q=await get(API+'/resources/recitations?language=en');verseRecitations=q.recitations||[];$('verseReciter').innerHTML=verseRecitations.map(r=>'<option value="'+r.id+'">'+safe(r.reciter_name||r.name||('Recitation '+r.id))+'</option>').join('');if(verseRecitations.some(r=>String(r.id)==='7'))$('verseReciter').value='7';}catch(e){$('verseReciter').innerHTML='<option value="7">Default recitation</option>';}await loadSurah(1);}
  catch(e){$('surahList').innerHTML='<div class="empty">Could not load Quran data. Please check your connection and reload.</div>';}
  try{
   const d=await get(MP3+'/reciters?language=eng');
@@ -72,7 +72,7 @@ async function loadSurah(id){
  stopAudio();
  try{
   const lang=$('language').value,trans=await findTranslation(lang),tafsir=await findTafsir(lang);
-  let url=API+'/verses/by_chapter/'+id+'?language='+lang+'&fields=text_uthmani,text_uthmani_tajweed&audio=7&per_page=300';
+  let url=API+'/verses/by_chapter/'+id+'?language='+lang+'&fields=text_uthmani,text_uthmani_tajweed&audio='+encodeURIComponent($('verseReciter').value||7)+'&per_page=300';
   if(trans)url+='&translations='+trans;if(tafsir)url+='&tafsirs='+tafsir;
   const d=await get(url);verseRows=d.verses||[];renderVerses(verseRows,lang);
  }catch(e){$('verses').innerHTML='<div class="empty">Unable to load this Surah. The content provider may be temporarily unavailable.</div>';}
@@ -121,7 +121,7 @@ function downloadVerse(i){
 }
 function stopAudio(){clearInterval(audioTimer);if(verseEndHandler){$('audio').removeEventListener('timeupdate',verseEndHandler);verseEndHandler=null;}$('audio').pause();$('audio').removeAttribute('src');$('audio').load();playingIndex=-1;}
 $('search').addEventListener('input',e=>renderChapters(e.target.value));
-$('language').addEventListener('change',()=>loadSurah(current));
+$('language').addEventListener('change',()=>loadSurah(current));$('verseReciter').addEventListener('change',()=>loadSurah(current));
 $('uiLang').addEventListener('change',e=>{document.documentElement.lang=e.target.value;$('surahLabel').textContent=uiText[e.target.value].surah;$('playAll').textContent=uiText[e.target.value].play;$('stop').textContent=uiText[e.target.value].stop;});
 $('playAll').addEventListener('click',playAll);$('stop').addEventListener('click',stopAudio);
 $('audio').addEventListener('ended',()=>{const n=+$('repeat').value;if(n===0||loopCount<n){loopCount++;$('audio').currentTime=0;$('audio').play();}else{loopCount=1;clearInterval(audioTimer);}});

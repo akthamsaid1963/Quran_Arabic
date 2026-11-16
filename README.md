@@ -13,7 +13,7 @@ For a production build:
 
 ```bash
 npm run build
-npm start
+npx serve out
 ```
 
 ## Included
